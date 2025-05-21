@@ -3,6 +3,7 @@ import sys
 from models import Parser
 from models.initial_solution import InitialSolution
 import os
+import multiprocessing as mp
 from models.genetic_solver import GeneticSolver
 from models.meta_genetic_optimizer import MetaGeneticOptimizer
 from validator.multiple_validator import validate_all_solutions
@@ -52,19 +53,31 @@ from validator.multiple_validator import validate_all_solutions
 #         print(f"{solution.fitness_score:,}", file)
 
 
-def run_instances(output_dir='output'):
+def run_instances(output_dir='output', n_processes=None):
     print(output_dir)
     directory = os.listdir('input')
     results = []
     os.makedirs(output_dir, exist_ok=True)
 
+    # Determine number of processes for parallel generation
+    if n_processes is None:
+        # Use CPU count by default
+        n_processes = mp.cpu_count()
+    
     for file in directory:
         if file.endswith('.txt'):
             print(f'Computing ./input/{file}')
             parser = Parser(f'./input/{file}')
             instance = parser.parse()
             initial_solution = InitialSolution.generate_initial_solution(instance)
-            genetic_solver = GeneticSolver(initial_solution=initial_solution, instance=instance)
+            
+            # Use parallel genetic solver with specified number of processes
+            genetic_solver = GeneticSolver(
+                initial_solution=initial_solution, 
+                instance=instance,
+                n_processes=n_processes
+            )
+            
             solution = genetic_solver.solve()
             score = solution.fitness_score
             results.append((file, score))
@@ -99,12 +112,20 @@ def run_instances(output_dir='output'):
 
 
 def main():
+    if len(sys.argv) > 2 and sys.argv[2].isdigit():
+        # Use the second argument as the number of processes for parallel generation
+        n_processes = int(sys.argv[2])
+        print(f"Using {n_processes} processes for parallel generation")
+    else:
+        # Use all CPU cores by default
+        n_processes = None
+    
     if len(sys.argv) > 1:
         subdir = sys.argv[1]
-        run_instances(f"./output/{subdir}")
+        run_instances(f"./output/{subdir}", n_processes)
     else:
         print("No argument provided. Saving outputs to ./output")
-        run_instances()
+        run_instances(n_processes=n_processes)
 
 
 if __name__ == "__main__":
